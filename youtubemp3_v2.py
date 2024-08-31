@@ -110,7 +110,7 @@ def process_input():
 # Application UI
 app = ctk.CTk()
 app.title(current_lang["title"])
-app.geometry("700x600")
+app.geometry("700x500")
 
 folder_label = ctk.CTkLabel(app, text=current_lang["folder_label"])
 folder_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")

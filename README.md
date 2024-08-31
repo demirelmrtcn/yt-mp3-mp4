@@ -16,8 +16,8 @@ This project is a simple YouTube MP3/Video downloader built using Python's `yt_d
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/your-repo-name.git
-    cd your-repo-name
+    git clone https://github.com/demirelmrtcn/yt-mp3-mp4.git
+    cd yt-mp3-mp4
     ```
 
 2. Install the required Python packages:
@@ -27,7 +27,7 @@ This project is a simple YouTube MP3/Video downloader built using Python's `yt_d
 
 3. Run the application:
     ```bash
-    python main.py
+    python youtubemp3_v2.py
     ```
 
 ### Usage
@@ -53,8 +53,8 @@ Bu proje, Python'un `yt_dlp` ve `customtkinter` kütüphanelerini kullanarak olu
 
 1. Depoyu klonlayın:
     ```bash
-    git clone https://github.com/yourusername/your-repo-name.git
-    cd your-repo-name
+    git clone https://github.com/demirelmrtcn/yt-mp3-mp4.git
+    cd yt-mp3-mp4
     ```
 
 2. Gerekli Python paketlerini yükleyin:
@@ -64,7 +64,7 @@ Bu proje, Python'un `yt_dlp` ve `customtkinter` kütüphanelerini kullanarak olu
 
 3. Uygulamayı çalıştırın:
     ```bash
-    python main.py
+    python youtubemp3_v2.py
     ```
 
 ### Kullanım

@@ -55,32 +55,55 @@ def update_ui_language():
     format_video_rb.configure(text=current_lang["format_video"])
     download_button.configure(text=current_lang["download_button"])
 
+
 def download_by_name(name, path, format_choice):
     search_query = f"ytsearch:{name}"
-    ydl_opts = {
-        'format': 'bestaudio/best' if format_choice == 'Müzik' else 'bestvideo[ext=mp4]+bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }] if format_choice == 'Müzik' else [],
-        'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
-        'quiet': True,
-    }
+
+    # Müzik ve video için ayarları ayırıyoruz
+    if format_choice == 'Müzik':
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
+            'quiet': True,
+        }
+    else:
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio/best',
+            'merge_output_format': 'mp4',  # Videoların mp4 formatında kaydedilmesi
+            'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
+            'quiet': True,
+        }
+
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([search_query])
 
+
 def download_by_link(link, path, format_choice):
-    ydl_opts = {
-        'format': 'bestaudio/best' if format_choice == 'Müzik' else 'bestvideo[ext=mp4]+bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }] if format_choice == 'Müzik' else [],
-        'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
-        'quiet': True,
-    }
+    # Müzik ve video için ayarları ayırıyoruz
+    if format_choice == 'Müzik':
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
+            'quiet': True,
+        }
+    else:
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio/best',
+            'merge_output_format': 'mp4',  # Videoların mp4 formatında kaydedilmesi
+            'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
+            'quiet': True,
+        }
+
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([link])
 
@@ -106,6 +129,9 @@ def process_input():
             download_by_link(item, folder_path, format_choice)
 
     messagebox.showinfo("Success", current_lang["success_message"])
+
+def load_flag_image(path):
+    return ctk.CTkImage(light_image=Image.open(path), dark_image=Image.open(path), size=(20, 15))
 
 # Application UI
 app = ctk.CTk()
@@ -141,14 +167,10 @@ format_video_rb.grid(row=3, column=2, pady=10, sticky="w")
 download_button = ctk.CTkButton(app, text=current_lang["download_button"], command=process_input, width=200)
 download_button.grid(row=5, column=1, columnspan=2, pady=20)
 
-# Language selection with flags
-def load_flag_image(path):
-    return ctk.CTkImage(light_image=Image.open(path), dark_image=Image.open(path), size=(30, 20))
-
 turkish_flag = load_flag_image("C:/PY/youtubemp3/turkish.png")
 english_flag = load_flag_image("C:/PY/youtubemp3/english.png")
 
-language_frame = ctk.CTkFrame(app, width=50, height=30)
+language_frame = ctk.CTkFrame(app)
 language_frame.grid(row=6, column=2, padx=10, pady=10, sticky="se")
 
 ctk.CTkButton(language_frame, image=turkish_flag, text="", command=lambda: change_language("tr")).grid(row=0, column=0, padx=5)

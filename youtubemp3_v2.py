@@ -59,8 +59,13 @@ def update_ui_language():
 def download_by_name(name, path, format_choice):
     search_query = f"ytsearch:{name}"
 
+    # Ortak HTTP başlıkları: Gerçek bir tarayıcıyı taklit ediyoruz.
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
+    }
+
     # Müzik ve video için ayarları ayırıyoruz
-    if format_choice == 'Müzik':
+    if format_choice in ['Müzik', 'Music (MP3)']:
         ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
@@ -70,22 +75,26 @@ def download_by_name(name, path, format_choice):
             }],
             'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
             'quiet': True,
+            'http_headers': headers
         }
     else:
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio/best',
-            'merge_output_format': 'mp4',  # Videoların mp4 formatında kaydedilmesi
+            'merge_output_format': 'mp4',
             'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
             'quiet': True,
+            'http_headers': headers
         }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([search_query])
 
-
 def download_by_link(link, path, format_choice):
-    # Müzik ve video için ayarları ayırıyoruz
-    if format_choice == 'Müzik':
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
+    }
+
+    if format_choice in ['Müzik', 'Music (MP3)']:
         ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
@@ -95,13 +104,15 @@ def download_by_link(link, path, format_choice):
             }],
             'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
             'quiet': True,
+            'http_headers': headers
         }
     else:
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio/best',
-            'merge_output_format': 'mp4',  # Videoların mp4 formatında kaydedilmesi
+            'merge_output_format': 'mp4',
             'outtmpl': os.path.join(path, '%(title)s.%(ext)s'),
             'quiet': True,
+            'http_headers': headers
         }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:

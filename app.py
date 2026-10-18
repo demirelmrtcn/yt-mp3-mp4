@@ -30,9 +30,11 @@ TEXT = {
         "clear": "Temizle",
         "pick": "İndirme klasörünü seç",
         "waiting": "Sırada",
-        "downloading": "{p}%  ·  {s}",
-        "processing": "Dönüştürülüyor…",
-        "done": "Tamamlandı",
+        "downloading": "{c}{p}%  ·  {s}",
+        "processing": "{c}Dönüştürülüyor…",
+        "done": "{c}Tamamlandı",
+        "partial": "{ok}/{n} indirildi",
+        "cancelled": "Durduruldu",
         "error": "Hata: {e}",
         "notfound": "Bulunamadı",
     },
@@ -47,9 +49,11 @@ TEXT = {
         "clear": "Clear",
         "pick": "Choose download folder",
         "waiting": "Queued",
-        "downloading": "{p}%  ·  {s}",
-        "processing": "Converting…",
-        "done": "Done",
+        "downloading": "{c}{p}%  ·  {s}",
+        "processing": "{c}Converting…",
+        "done": "{c}Done",
+        "partial": "{ok}/{n} downloaded",
+        "cancelled": "Stopped",
         "error": "Error: {e}",
         "notfound": "Not found",
     },
@@ -63,7 +67,9 @@ BORDER = ("#E2E5EB", "#262B35")
 FG = ("#111318", "#ECEEF2")
 MUTED = ("#6B7280", "#8A92A0")
 ACCENT, ACCENT_HOVER = "#FF3D52", "#E52E43"
-OK, BAD = "#22C55E", "#EF4444"
+OK, BAD, WARN = "#22C55E", "#EF4444", "#F59E0B"
+STATE_COLOR = {"done": OK, "error": BAD, "notfound": BAD, "partial": WARN, "cancelled": MUTED}
+FINAL = tuple(STATE_COLOR)  # bu durumlardaki satırlar bitmiştir
 FONT = "Segoe UI" if sys.platform == "win32" else None
 
 
@@ -89,11 +95,28 @@ def clean_settings(saved):
     return {k: v for k, v in saved.items() if k in valid and valid[k](v)}
 
 
+def clean_error(msg):
+    return re.sub(r"^ERROR:\s*(\[\w+\]\s*)?(Got error:\s*)?", "", str(msg)).split("\n")[0][:80]
+
+
+class ErrorLog:
+    """yt-dlp logger'ı: ignoreerrors açıkken hata istisna olmaz, son hatayı burada tutarız."""
+    err = None
+
+    def debug(self, msg):
+        pass
+
+    info = warning = debug
+
+    def error(self, msg):
+        self.err = msg
+
+
 def ffmpeg_path():
     return shutil.which("ffmpeg") or __import__("imageio_ffmpeg").get_ffmpeg_exe()
 
 
-def build_opts(fmt, quality, folder, hook):
+def build_opts(fmt, quality, folder, hook, logger=None):
     opts = {
         # ara dosyalar (parçalar, kapak) geçici klasörde kalır; klasöre yalnız bitmiş dosya taşınır
         "paths": {"home": folder, "temp": os.path.join(tempfile.gettempdir(), "yt-mp3-mp4")},
@@ -101,12 +124,15 @@ def build_opts(fmt, quality, folder, hook):
         "ffmpeg_location": ffmpeg_path(),
         # YouTube imza çözümü için JS çalışma ortamı gerekir; hangisi kuruluysa o kullanılır
         "js_runtimes": {"deno": {}, "node": {}, "bun": {}},
-        "noplaylist": True,
+        "noplaylist": True,  # playlist içinden paylaşılan şarkı linki tek şarkı indirir
+        "ignoreerrors": True,  # listedeki silinmiş/gizli video tüm listeyi durdurmasın
+        "logger": logger,
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
         "progress_hooks": [hook],
         "postprocessor_hooks": [hook],
+        "post_hooks": [hook],  # her dosya bitince yolu (str) ile çağrılır
     }
     if fmt == "MP3":
         opts |= {
@@ -139,6 +165,7 @@ class Row(ctk.CTkFrame):
         super().__init__(master, fg_color=FIELD, corner_radius=12)
         self.app = app
         self.status = ("waiting", {})
+        self.cancelled = False  # işçi thread'i okur; ✕ ile True olur
         self.grid_columnconfigure(1, weight=1)
         badge = ctk.CTkLabel(self, text="♪" if fmt == "MP3" else "▶", width=34, height=34, corner_radius=10,
                              fg_color=ACCENT, text_color="white", font=ctk.CTkFont(FONT, 15, "bold"))
@@ -146,28 +173,42 @@ class Row(ctk.CTkFrame):
         self.title = ctk.CTkLabel(self, text=query, anchor="w", text_color=FG, font=ctk.CTkFont(FONT, 13, "bold"))
         self.title.grid(row=0, column=1, sticky="ew", pady=(10, 0))
         self.info = ctk.CTkLabel(self, text="", anchor="e", text_color=MUTED, font=ctk.CTkFont(FONT, 12))
-        self.info.grid(row=0, column=2, padx=(8, 14), pady=(10, 0))
+        self.info.grid(row=0, column=2, padx=(8, 6), pady=(10, 0))
+        self.stop = ctk.CTkButton(self, text="✕", width=30, height=30, corner_radius=8, fg_color="transparent",
+                                  hover_color=BORDER, text_color=MUTED, font=ctk.CTkFont(FONT, 13),
+                                  command=self.cancel)
+        self.stop.grid(row=0, column=3, rowspan=2, padx=(0, 10))
         self.bar = ctk.CTkProgressBar(self, height=5, corner_radius=3, progress_color=ACCENT, fg_color=BORDER)
         self.bar.set(0)
-        self.bar.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(0, 14), pady=(4, 12))
+        self.bar.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(0, 6), pady=(4, 12))
         self.render()
 
     def set_title(self, title):
         self.title.configure(text=title if len(title) <= 70 else title[:67] + "…")
 
+    def cancel(self):
+        self.cancelled = True
+        if self.status[0] == "waiting":
+            self.update_status("cancelled")
+        self.stop.configure(state="disabled")
+
     def update_status(self, key, **kw):
+        if self.status[0] in FINAL:  # durdurulan satıra geç gelen olaylar
+            return
         self.status = (key, kw)
-        if key == "downloading":
-            self.bar.set(kw["p"] / 100)
-        elif key in ("processing", "done", "error", "notfound"):
+        if "b" in kw:
+            self.bar.set(kw["b"])
+        elif key in FINAL:
             self.bar.set(1)
-        self.bar.configure(progress_color={"done": OK, "error": BAD, "notfound": BAD}.get(key, ACCENT))
+        if key in FINAL:
+            self.stop.grid_remove()
+        self.bar.configure(progress_color=STATE_COLOR.get(key, ACCENT))
         self.render()
 
     def render(self):
         key, kw = self.status
         self.info.configure(text=self.app.t(key).format(**kw),
-                            text_color={"done": OK, "error": BAD, "notfound": BAD}.get(key, MUTED))
+                            text_color=STATE_COLOR.get(key, MUTED))
 
 
 class App(ctk.CTk):
@@ -334,7 +375,7 @@ class App(ctk.CTk):
             subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", path])
 
     def clear(self):
-        for row in [r for r in self.rows if r.status[0] in ("done", "error", "notfound")]:
+        for row in [r for r in self.rows if r.status[0] in FINAL]:
             row.destroy()
             self.rows.remove(row)
         if not self.rows:
@@ -361,32 +402,60 @@ class App(ctk.CTk):
         # ponytail: tek işçi, sırayla indirir; paralel indirme gerekirse birden çok thread başlat
         while True:
             row, target, fmt, quality, folder = self.jobs.get()
+            if row.cancelled:
+                self.events.put((row, "cancelled", {}))
+                continue
+            st = {"title": None, "any": False, "ok": 0, "n": 1, "i": 1}
+            log = ErrorLog()
 
-            seen = {"title": None, "any": False}
-
-            def hook(d, row=row, seen=seen):
-                seen["any"] = True
-                title = (d.get("info_dict") or {}).get("title")
-                if title and title != seen["title"]:
-                    seen["title"] = title
+            def hook(d, row=row, st=st):
+                if row.cancelled:
+                    raise yt_dlp.utils.DownloadCancelled()
+                if isinstance(d, str):  # post_hooks: bitmiş dosyanın yolu, klasöre ulaştı
+                    st["ok"] += 1
+                    return
+                st["any"] = True
+                info = d.get("info_dict") or {}
+                st["n"] = info.get("n_entries") or st["n"]
+                st["i"] = info.get("playlist_index") or st["i"]
+                n, i = st["n"], st["i"]
+                c = f"{i}/{n}  ·  " if n > 1 else ""
+                title = info.get("title")
+                if title and n > 1 and info.get("playlist_title"):
+                    title = f"{info['playlist_title']}  ›  {title}"
+                if title and title != st["title"]:
+                    st["title"] = title
                     self.events.put((row, "title", {"title": title}))
                 if "postprocessor" in d:  # dönüştürme / birleştirme adımı
                     if d["status"] == "started":
-                        self.events.put((row, "processing", {}))
+                        self.events.put((row, "processing", {"c": c, "b": i / n}))
                 elif d["status"] == "downloading":
-                    # ponytail: MP4'te video ve ses ayrı iner, çubuk ses için 0'dan tekrar başlar
+                    # ponytail: MP4'te video ve ses ayrı iner, şarkı içi yüzde ses için 0'dan tekrar başlar
                     total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-                    p = int(d.get("downloaded_bytes", 0) * 100 / total) if total else 0
-                    self.events.put((row, "downloading", {"p": min(p, 100), "s": human_speed(d.get("speed"))}))
+                    p = min(int(d.get("downloaded_bytes", 0) * 100 / total), 100) if total else 0
+                    self.events.put((row, "downloading",
+                                     {"c": c, "p": p, "s": human_speed(d.get("speed")), "b": (i - 1 + p / 100) / n}))
 
             try:
                 os.makedirs(folder, exist_ok=True)
-                with yt_dlp.YoutubeDL(build_opts(fmt, quality, folder, hook)) as ydl:
+                with yt_dlp.YoutubeDL(build_opts(fmt, quality, folder, hook, log)) as ydl:
                     ydl.download([target])
-                self.events.put((row, "done" if seen["any"] else "notfound", {}))
-            except Exception as e:  # yt-dlp hatası satırda gösterilir, uygulama çökmez
-                msg = re.sub(r"^ERROR:\s*(\[\w+\]\s*)?(Got error:\s*)?", "", str(e)).split("\n")[0]
-                self.events.put((row, "error", {"e": msg[:80]}))
+                ok, n = st["ok"], st["n"]
+                if row.cancelled:
+                    self.events.put((row, "cancelled", {}))
+                elif ok and ok >= n:
+                    self.events.put((row, "done", {"c": f"{n}/{n}  ·  " if n > 1 else ""}))
+                elif ok or (n > 1 and st["any"]):
+                    self.events.put((row, "partial", {"ok": ok, "n": n}))
+                elif log.err:
+                    self.events.put((row, "error", {"e": clean_error(log.err)}))
+                else:
+                    self.events.put((row, "notfound", {}))
+            except Exception as e:  # durdurma ya da yt-dlp hatası satırda gösterilir, uygulama çökmez
+                if row.cancelled:
+                    self.events.put((row, "cancelled", {}))
+                else:
+                    self.events.put((row, "error", {"e": clean_error(e)}))
 
     def poll(self):
         while not self.events.empty():

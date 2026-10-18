@@ -10,6 +10,8 @@ A clean, modern desktop app for downloading YouTube as MP3 / MP4.
 ### Özellikler
 - **Link ya da isim** — her satıra bir link veya şarkı adı yaz; link olmayanlar YouTube'da aranır, ilk sonuç indirilir.
 - **Toplu indirme kuyruğu** — her satırın kendi ilerleme çubuğu, hızı ve durumu var; indirme sırasında arayüz donmaz.
+- **Playlist desteği** — listenin adı, toplam şarkı sayısı ve kaçıncı şarkıda olduğu (ör. `3/11`) görünür; ilerleme çubuğu tüm listeyi gösterir. İndirilemeyen bir şarkı listeyi durdurmaz, sonunda `10/11 indirildi` gibi özet çıkar.
+- **Durdur (✕)** — sıradaki indirmeyi kuyruktan çıkarır, devam eden indirmeyi (playlist dahil) anında keser.
 - **MP3:** 320 / 192 / 128 kbps, **kapak resmi, başlık ve sanatçı bilgisi dosyaya gömülür.**
 - **MP4:** Max / 1080p / 720p / 480p, her oynatıcıda açılan mp4 tercih edilir.
 - Açık / koyu tema, Türkçe / İngilizce arayüz.
@@ -38,6 +40,8 @@ python app.py
 ### Features
 - **Link or name** — one link or song name per line; anything that isn't a link is searched on YouTube and the first result is downloaded.
 - **Batch queue** — each line gets its own progress bar, speed and status; the UI never freezes.
+- **Playlists** — shows the playlist name, total track count and current position (e.g. `3/11`); the bar tracks the whole list. A failing track does not stop the list; you get a summary like `10/11 downloaded`.
+- **Stop (✕)** — removes a queued download or instantly stops a running one (playlists included).
 - **MP3:** 320 / 192 / 128 kbps with **embedded cover art, title and artist.**
 - **MP4:** Max / 1080p / 720p / 480p, preferring mp4 streams that play everywhere.
 - Light / dark theme, Turkish / English UI.
